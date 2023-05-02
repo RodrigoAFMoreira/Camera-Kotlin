@@ -1,68 +1,76 @@
 package com.example.picturemode
 
-import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.os.Bundle
 import android.provider.MediaStore
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import coil.load
-import com.example.picturemode.databinding.ActivityCameraBinding
-import com.karumi.dexter.Dexter
-import com.karumi.dexter.MultiplePermissionsReport
-import com.karumi.dexter.PermissionToken
-import com.karumi.dexter.listener.PermissionRequest
-import com.karumi.dexter.listener.multi.MultiplePermissionsListener
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 
 @Suppress("DEPRECATION")
 class CameraActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityCameraBinding
-    private val CAMERA_REQUEST_CODE = 1
+    val REQUEST_IMAGE_CAPTURE = 100
+    val PERMISSION_REQUEST_CODE = 200
+    lateinit var imageView: ImageView
+    lateinit var buttonCamera: Button
+    lateinit var buttonFiltro: Button
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityCameraBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_camera)
 
-        binding.btnCamera.setOnClickListener {
-            cameraCheckPermission()
-        }
-    }
-    private fun cameraCheckPermission() {
-        Dexter.withContext(this)
-            .withPermissions(
-                android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                android.Manifest.permission.CAMERA).withListener(
-                object : MultiplePermissionsListener {
-                    override fun onPermissionsChecked(report: MultiplePermissionsReport?) {
-                        report?.let {
-                            if (report.areAllPermissionsGranted()) {
-                                camera()
-                            }
-                        }
-                    }
-                    override fun onPermissionRationaleShouldBeShown(
-                        p0: MutableList<PermissionRequest>?,
-                        p1: PermissionToken?) {
-                    }
-                }
-            ).onSameThread().check()
-    }
-    private fun camera() {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        startActivityForResult(intent, CAMERA_REQUEST_CODE)
-    }
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == Activity.RESULT_OK) {
-            when (requestCode) {
-                CAMERA_REQUEST_CODE -> {
-                    val bitmap = data?.extras?.get("data") as Bitmap
-                    binding.imageView.load(bitmap) {
-                    }
+        imageView = findViewById(R.id.imageView)
+        buttonCamera = findViewById(R.id.btnCamera)
+        buttonFiltro = findViewById(R.id.btnColor)
+
+        if (checkPermission()) {
+            buttonCamera.setOnClickListener {
+                val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                try {
+                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(this, "Error: " + e.localizedMessage, Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+
+        buttonFiltro.setOnClickListener{
+            imageView.colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f)})
+        }
+    }
+
+
+    private fun checkPermission(): Boolean {
+        return if (ContextCompat.checkSelfPermission(this,android.Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermission()
+            true
+        } else false
+    }
+    private fun requestPermission() {
+        ActivityCompat.requestPermissions(
+            this, arrayOf<String>(android.Manifest.permission.CAMERA),
+            PERMISSION_REQUEST_CODE
+        )
+    }
+
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+            val imageBitmap = data?.extras?.get("data") as Bitmap
+            imageView.setImageBitmap(imageBitmap)
+        } else {
+            super.onActivityResult(requestCode, resultCode, data)
         }
     }
 }
